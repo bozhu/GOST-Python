@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+
 sbox = (
     (4, 10, 9, 2, 13, 8, 0, 14, 6, 11, 1, 12, 7, 15, 5, 3),
     (14, 11, 4, 12, 6, 13, 15, 10, 2, 3, 8, 1, 0, 7, 5, 9),
@@ -11,28 +12,92 @@ sbox = (
     (1, 15, 13, 0, 5, 7, 10, 4, 9, 2, 3, 14, 6, 11, 8, 12),
 )
 
+
+def _bit_length(x):
+    assert x >= 0
+    return len(bin(x)) - 2
+
+
 def f_function(input, key):
-    output = input
+    assert _bit_length(input) <= 32
+    assert _bit_length(key)   <= 32
+
+    temp = input ^ key
+
+    output = 0
+    for i in range(8):
+        output |= (sbox[i][(temp >> (5 * i)) & 0x1F] << (5 * i))
+
+    output = (output >> 11) | ((output << 21) & 0xFFFFFFFF)
+
     return output
 
-def round_function(left, right, round_key):
-    left, right = right, left
-    return left, right
+
+def round_encryption(input_left, input_right, round_key):
+    output_left = input_right
+    output_right = input_left ^ f_function(input_right, round_key)
+
+    return output_left, output_right
+
+
+def round_decryption(input_left, input_right, round_key):
+    output_right = input_left
+    output_left = input_right ^ f_function(input_left, round_key)
+
+    return output_left, output_right
+
 
 class GOST:
     def __init__(self):
-        self.master_key = None
+        self.master_key = [None] * 8
+
 
     def set_key(self, master_key):
-        self.master_key = master_key
+        assert _bit_length(master_key) <= 256
+        for i in range(8):
+            self.master_key[i] = (master_key >> (5 * i)) & 0xFFFFFFFF
+
 
     def encrypt(self, plaintext):
-        ciphertext = None
-        return ciphertext
+        assert _bit_length(plaintext) <= 64
+        text_left = plaintext >> 32
+        text_right = plaintext & 0xFFFFFFFF
+
+        for i in range(24):
+            text_left, text_right = round_encryption(text_left, text_right, self.master_key[i % 8])
+
+        for i in range(8):
+            text_left, text_right = round_encryption(text_left, text_right, self.master_key[7 - i])
+
+        return (text_left << 32) | text_right
+
 
     def decrypt(self, ciphertext):
-        plaintext = None
-        return plaintext
+        assert _bit_length(ciphertext) <= 64
+        text_left = ciphertext >> 32
+        text_right = ciphertext & 0xFFFFFFFF
+
+        for i in range(8):
+            text_left, text_right = round_decryption(text_left, text_right, self.master_key[i])
+
+        for i in range(24):
+            text_left, text_right = round_decryption(text_left, text_right, self.master_key[(7 - i) % 8])
+
+        return (text_left << 32) | text_right
+
 
 if __name__ == '__main__':
-    pass
+    plain = 0x0123456789abcdef
+    master = 0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff
+
+    my_GOST = GOST()
+    my_GOST.set_key(master)
+
+    encrypted = my_GOST.encrypt(plain)
+    print hex(encrypted)
+
+    decrypted = my_GOST.decrypt(encrypted)
+    print hex(decrypted)
+
+
+    
