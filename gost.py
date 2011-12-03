@@ -26,9 +26,9 @@ def f_function(input, key):
 
     output = 0
     for i in range(8):
-        output |= (sbox[i][(temp >> (5 * i)) & 0x1F] << (5 * i))
+        output |= ((sbox[i][(temp >> (4 * i)) & 0b1111]) << (4 * i))
 
-    output = (output >> 11) | ((output << 21) & 0xFFFFFFFF)
+    output = ((output >> 11) | (output << (32 - 11))) & 0xFFFFFFFF
 
     return output
 
@@ -55,13 +55,14 @@ class GOST:
     def set_key(self, master_key):
         assert _bit_length(master_key) <= 256
         for i in range(8):
-            self.master_key[i] = (master_key >> (5 * i)) & 0xFFFFFFFF
-
+            self.master_key[i] = (master_key >> (32 * i)) & 0xFFFFFFFF
+        # print 'master_key', [hex(i) for i in self.master_key]
 
     def encrypt(self, plaintext):
         assert _bit_length(plaintext) <= 64
         text_left = plaintext >> 32
         text_right = plaintext & 0xFFFFFFFF
+        # print 'text', hex(text_left), hex(text_right)
 
         for i in range(24):
             text_left, text_right = round_encryption(text_left, text_right, self.master_key[i % 8])
@@ -87,17 +88,18 @@ class GOST:
 
 
 if __name__ == '__main__':
-    plain = 0x0123456789abcdef
-    master = 0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff
+    text = 0xfedcba0987654321
+    key = 0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff
 
     my_GOST = GOST()
-    my_GOST.set_key(master)
+    my_GOST.set_key(key)
 
-    encrypted = my_GOST.encrypt(plain)
-    print hex(encrypted)
+    num = 1000
 
-    decrypted = my_GOST.decrypt(encrypted)
-    print hex(decrypted)
+    for i in range(num):
+        text = my_GOST.encrypt(text)
+    print hex(text)
 
-
-    
+    for i in range(num):
+        text = my_GOST.decrypt(text)
+    print hex(text)
