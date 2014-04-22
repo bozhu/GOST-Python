@@ -28,7 +28,7 @@ def f_function(input, key):
     for i in range(8):
         output |= ((sbox[i][(temp >> (4 * i)) & 0b1111]) << (4 * i))
 
-    output = ((output >> 11) | (output << (32 - 11))) & 0xFFFFFFFF
+    output = ((output >> 32-11) | (output << 11)) & 0xFFFFFFFF
 
     return output
 
