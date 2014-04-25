@@ -18,17 +18,17 @@ def _bit_length(x):
     return len(bin(x)) - 2
 
 
-def f_function(input, key):
-    assert _bit_length(input) <= 32
-    assert _bit_length(key)   <= 32
+def f_function(var, key):
+    assert _bit_length(var) <= 32
+    assert _bit_length(key) <= 32
 
-    temp = input ^ key
+    temp = (var + key) % (1 << 32)
 
     output = 0
     for i in range(8):
         output |= ((sbox[i][(temp >> (4 * i)) & 0b1111]) << (4 * i))
 
-    output = ((output >> 32-11) | (output << 11)) & 0xFFFFFFFF
+    output = ((output >> (32 - 11)) | (output << 11)) & 0xFFFFFFFF
 
     return output
 
@@ -51,7 +51,6 @@ class GOST:
     def __init__(self):
         self.master_key = [None] * 8
 
-
     def set_key(self, master_key):
         assert _bit_length(master_key) <= 256
         for i in range(8):
@@ -65,13 +64,14 @@ class GOST:
         # print 'text', hex(text_left), hex(text_right)
 
         for i in range(24):
-            text_left, text_right = round_encryption(text_left, text_right, self.master_key[i % 8])
+            text_left, text_right = round_encryption(
+                text_left, text_right, self.master_key[i % 8])
 
         for i in range(8):
-            text_left, text_right = round_encryption(text_left, text_right, self.master_key[7 - i])
+            text_left, text_right = round_encryption(
+                text_left, text_right, self.master_key[7 - i])
 
         return (text_left << 32) | text_right
-
 
     def decrypt(self, ciphertext):
         assert _bit_length(ciphertext) <= 64
@@ -79,10 +79,12 @@ class GOST:
         text_right = ciphertext & 0xFFFFFFFF
 
         for i in range(8):
-            text_left, text_right = round_decryption(text_left, text_right, self.master_key[i])
+            text_left, text_right = round_decryption(
+                text_left, text_right, self.master_key[i])
 
         for i in range(24):
-            text_left, text_right = round_decryption(text_left, text_right, self.master_key[(7 - i) % 8])
+            text_left, text_right = round_decryption(
+                text_left, text_right, self.master_key[(7 - i) % 8])
 
         return (text_left << 32) | text_right
 
